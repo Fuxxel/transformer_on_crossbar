@@ -1,9 +1,71 @@
 from options import Options
 
 import torch
+from torch.utils.data import Dataset
 
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+
+class FakeDataSet(Dataset):
+	def __init__(self, options):
+		super().__init__()
+		
+		assert(type(options) == Options)
+
+		self.__options = options
+		self.__data_scaler = MinMaxScaler(feature_range=(self.__options.scaler_min, self.__options.scaler_max))
+
+		self.window_size = self.__options.window_size
+		self.num_samples = self.__options.num_samples
+		self.device = self.__options.device
+
+		self.min = self.__options.scaler_min
+		self.max = self.__options.scaler_max
+
+		self.__prepare_data()
+
+	def __normalize_sample(self, sample):
+		scale = (self.max - self.min) / (sample.max() - sample.min())
+		return scale * sample + self.min - sample.min() * scale
+
+	def __len__(self):
+		return self.__options.num_samples
+
+	def __getitem__(self, idx):
+		start_index = idx * self.window_size
+		return self.__normalize_sample(self.signal[start_index:start_index + self.window_size]).unsqueeze(-1)
+		
+	def __random_frequency(self):
+		freq_range_low = self.__options.random_frequency_range_low
+		freq_range_high = self.__options.random_frequency_range_high
+		return np.random.uniform(freq_range_low, freq_range_high)
+
+	def __generate_timeseries(self, time, random_frequencies=None):
+		if not random_frequencies:
+			num_random_frequencies = self.__options.num_random_frequencies
+			random_frequencies = [self.__random_frequency() for _ in range(num_random_frequencies)]
+
+		carrier = np.sin(time)
+		for random_frequency in random_frequencies:
+			carrier += np.sin(time * random_frequency)
+
+		if self.__options.add_noise:
+			noise_range = self.__options.noise_range
+			carrier += np.random.uniform(-noise_range, noise_range, len(carrier))
+
+		return random_frequencies, carrier
+
+	def __prepare_data(self, random_frequencies=None):
+		num_predict_forward_steps = self.__options.num_predict_forward_steps
+
+		num_timesteps = self.num_samples * self.window_size
+		multiplier = num_timesteps // 1000
+		time = np.linspace(0, 2 * np.pi * multiplier, num_timesteps)
+
+		self.random_frequencies, self.signal = self.__generate_timeseries(time, random_frequencies=random_frequencies)
+		# self.signal = np.reshape(self.signal, (-1, 1))
+		# self.signal = self.__data_scaler.fit_transform(self.signal)
+		self.signal = torch.from_numpy(self.signal).float().to(self.device)
 
 class FakeDataGenerator():
 

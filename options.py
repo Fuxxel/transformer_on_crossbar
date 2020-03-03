@@ -8,6 +8,7 @@ class Options(object):
 			"num_input_features": 250,
 			"learning_rate": 0.0005,
 			"num_epochs": 20,
+			"artifact_dir": "artifacts",
 
 			# Fake Data Generator Options
 			"num_predict_forward_steps": 1,
