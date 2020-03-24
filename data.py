@@ -2,9 +2,135 @@ from options import Options
 
 import torch
 from torch.utils.data import Dataset
+import h5py
 
+import random
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+
+# class CoinDataSubset(Dataset):
+# 	def __init__(self, dataset, indices):
+# 		self.dataset = dataset
+# 		self.indices = indices
+
+# 		self.dataset.expand_indices(self.indices)
+
+# 	def __getitem__(self, idx):
+# 		return self.dataset[self.indices[idx]]
+
+# 	def __len__(self):
+# 		return len(self.dataset)
+
+class CoinDataSubset(Dataset):
+	def __init__(self, options, references, indices):
+		super().__init__()
+
+		assert(type(options) == Options)
+
+		self.indices = indices
+		self.__options = options
+		self.__data_scaler = MinMaxScaler(feature_range=(self.__options.scaler_min, self.__options.scaler_max))
+
+		self.window_size = self.__options.window_size
+		self.device = self.__options.device
+
+		self.min = self.__options.scaler_min
+		self.max = self.__options.scaler_max
+
+		self.preloaded_data = []
+		self.preloaded_references = references
+
+		self.data_file = h5py.File(self.__options.path_to_coins, "r")
+		
+		self.__expand_indices()
+
+		self.data_file.close()
+
+	@staticmethod
+	def coin_to_index(coin):
+		coins = [1, 2, 5, 20, 50, 100, 200]
+		return coins.index(coin)
+
+	@staticmethod
+	def index_to_coin(index):
+		coins = [1, 2, 5, 20, 50, 100, 200]
+		return coins[index]
+
+	def __to_one_hot(self, index, max_index):
+		encoding = np.zeros(max_index)
+		encoding[index] = 1
+		return encoding
+
+	def __normalize_sample(self, sample):
+		scale = (self.max - self.min) / (sample.max() - sample.min())
+		return scale * sample + self.min - sample.min() * scale
+
+	def __len__(self):
+		return len(self.preloaded_data)
+
+	def __getitem__(self, idx):
+		return self.preloaded_data[idx]
+
+	def __load_sample_from_data(self, coin, sample):
+		timeseries = self.data_file[coin][sample][()]
+		normalized_timeseries = self.__normalize_sample(timeseries)
+
+		one_hot_index = np.asarray(self.coin_to_index(int(coin)))
+		one_hot_index = torch.from_numpy(one_hot_index).long().to(self.device)
+		normalized_timeseries = torch.from_numpy(normalized_timeseries[..., None]).float().to(self.device)
+		return one_hot_index, normalized_timeseries
+
+	def __expand_indices(self):
+		hop_length = self.__options.hop_length if self.__options.hop_length else self.window_size // 2
+		for current, index in enumerate(self.indices):
+			print(f"\r{current + 1}/{len(self.indices)}", end="")
+			coin, sample_num = self.preloaded_references[index]
+			one_hot_index, normalized_timeseries = self.__load_sample_from_data(coin, sample_num)
+
+			max_length = normalized_timeseries.shape[0]
+			for i in range(0, max_length - self.window_size, hop_length):
+				self.preloaded_data.append((one_hot_index, normalized_timeseries[i:i + self.window_size]))
+		print()
+
+class CoinDataSetPreparer():
+	def __init__(self, options):
+		super().__init__()
+
+		assert(type(options) == Options)
+
+		self.__options = options
+	
+		self.preloaded_references = []
+
+		self.data_file = h5py.File(self.__options.path_to_coins, "r")
+		
+		self.__prepare_data()
+
+		self.data_file.close()
+
+	def get_options(self):
+		return self.__options
+
+	def __len__(self):
+		return len(self.preloaded_references)
+
+	def __prepare_data(self):
+		# First determine how many coins to load for each type
+		minimum = 10
+		for coin in self.data_file.keys():
+			minimum = np.minimum(minimum, len(self.data_file[coin].keys()))
+
+		if np.isinf(minimum):
+			raise ValueError(f"ERROR: No data found in {self.__options.path_to_coins}")
+
+		print(f"Loading {minimum} random samples per coin class.")
+		
+		for coin in self.data_file.keys():
+			samples = random.choices(list(self.data_file[coin].keys()), k=minimum)
+			for i in samples:
+				self.preloaded_references.append((coin, i))
+
+		random.shuffle(self.preloaded_references)
 
 class FakeDataSet(Dataset):
 	def __init__(self, options):
