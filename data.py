@@ -6,20 +6,6 @@ import h5py
 
 import random
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-
-# class CoinDataSubset(Dataset):
-# 	def __init__(self, dataset, indices):
-# 		self.dataset = dataset
-# 		self.indices = indices
-
-# 		self.dataset.expand_indices(self.indices)
-
-# 	def __getitem__(self, idx):
-# 		return self.dataset[self.indices[idx]]
-
-# 	def __len__(self):
-# 		return len(self.dataset)
 
 class CoinDataSubset(Dataset):
 	def __init__(self, options, references, indices):
@@ -29,7 +15,6 @@ class CoinDataSubset(Dataset):
 
 		self.indices = indices
 		self.__options = options
-		self.__data_scaler = MinMaxScaler(feature_range=(self.__options.scaler_min, self.__options.scaler_max))
 
 		self.window_size = self.__options.window_size
 		self.device = self.__options.device

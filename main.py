@@ -96,7 +96,6 @@ def main(args):
 
 			print("Train steps...")
 			for current_batch_num, train_batch in enumerate(loaded_training_data):
-				print(f"\r{current_batch_num + 1}/{batches_per_epoch_train}", end="")
 				num_train_predictions += 1
 				optimizer.zero_grad()
 
@@ -113,12 +112,13 @@ def main(args):
 				loss.backward()
 				torch.nn.utils.clip_grad_norm_(transformer.parameters(), 0.7)
 				optimizer.step()
+				
+				print(f"\r{current_batch_num + 1}/{batches_per_epoch_train}, loss: {total_train_loss / (current_batch_num + 1):.05f}, acc: {total_train_acc / (current_batch_num + 1):.05f}", end="")
 			print()
 
 			print("Validation steps...")
 			with torch.no_grad():
 				for current_batch_num, val_batch in enumerate(loaded_validation_data):
-					print(f"\r{current_batch_num + 1}/{batches_per_epoch_val}", end="")
 					num_val_predictions += 1
 
 					labels, input_sequences = val_batch
@@ -129,12 +129,12 @@ def main(args):
 					total_val_loss += val_loss.item()
 					acc = classification_accuracy(input=val_predictions, target=labels)
 					total_val_acc += acc
+
+					print(f"\r{current_batch_num + 1}/{batches_per_epoch_val}, loss: {total_val_loss / (current_batch_num + 1):.05f}, acc: {total_val_acc / (current_batch_num + 1)}", end="")
 			print()
 			
 			print(f"Epoch: {current_epoch:03d} | Train loss: {total_train_loss / num_train_predictions:.05f} | Train acc: {total_train_acc / num_train_predictions:.05f}"
 			f" | Val loss: {total_val_loss / num_val_predictions:.05f} | Val acc: {total_val_acc / num_val_predictions:.05f}")
-			total_train_loss = 0.0
-			total_val_loss = 0.0
 
 	else:
 		criterion = MSELoss()
