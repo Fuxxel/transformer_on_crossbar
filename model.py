@@ -34,7 +34,7 @@ class TransformerClassifier(torch.nn.Module):
 		self.classifier.bias.data.zero_()
 		self.classifier.weight.data.uniform_(-init_range, init_range)
 
-	def forward(self, x):
+	def forward(self, x, return_latent=False):
 		if self.src_mask is None or self.src_mask.size(0) != len(x):
 			self.src_mask = self.__generate_square_subsequent_mask(len(x)).to(x.device)
 
@@ -44,7 +44,10 @@ class TransformerClassifier(torch.nn.Module):
 		# Only take the last tensor in memory sequence to predict 
 		to_classify = output[-1, :, :]
 		output = self.classifier(to_classify)
-		return output
+		if return_latent == False:
+			return output  
+		else:
+			return output, to_classify
 
 	def __generate_square_subsequent_mask(self, size):
 		mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)

@@ -101,7 +101,7 @@ class CoinDataSetPreparer():
 
 	def __prepare_data(self):
 		# First determine how many coins to load for each type
-		minimum = 10
+		minimum = 10000
 		for coin in self.data_file.keys():
 			minimum = np.minimum(minimum, len(self.data_file[coin].keys()))
 

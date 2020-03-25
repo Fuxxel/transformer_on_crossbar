@@ -9,6 +9,8 @@ class Options(object):
 			"learning_rate": 0.0005,
 			"num_epochs": 20,
 			"artifact_dir": "artifacts",
+			"model_save_path": "trained_models",
+			"latent_space_save_path": "latent_spaces",
 			"problem": "coin", # also possible: 'fake' for fake sin data
 
 			# Coin Data Set Options

@@ -15,6 +15,7 @@ import argparse
 from time import time
 from itertools import tee
 import os
+from datetime import datetime
 
 def random_split(dataset, lengths):
 	if sum(lengths) != len(dataset):
@@ -39,6 +40,13 @@ def mse(x, y):
 
 def classification_accuracy(input, target):
 	return (input.argmax(-1) == target).float().mean()
+
+def write_options_to_file(options, path):
+	with open(path, "w") as out_file:
+		for name in options.get_option_names():
+			value = getattr(options, name)
+			if type(value) in [str, int, float, bool]:
+				out_file.write(f"{name}:{value}\n")
 
 def main(args):
 	
@@ -81,9 +89,17 @@ def main(args):
 		loaded_validation_data = DataLoader(validation_data, batch_size=batch_size, shuffle=False, drop_last=True)
 		loaded_test_data = DataLoader(test_data, batch_size=batch_size, shuffle=False, drop_last=True)
 
+		timestamp = datetime.now().strftime("%y_%m_%d_%H_%M_%S_%f")
+		model_save_path = os.path.join(options.model_save_path, timestamp)
+		os.makedirs(model_save_path, exist_ok=False)
+
+		write_options_to_file(options, os.path.join(model_save_path, "options.txt"))
+
 		batches_per_epoch_train = len(loaded_training_data)
 		batches_per_epoch_val = len(loaded_validation_data)
 		current_epoch = 1
+		best_val_acc = 0
+		path_to_best_model_weights = None
 		for current_epoch in range(1, options.num_epochs + 1):
 			transformer.train()
 			
@@ -116,6 +132,7 @@ def main(args):
 				print(f"\r{current_batch_num + 1}/{batches_per_epoch_train}, loss: {total_train_loss / (current_batch_num + 1):.05f}, acc: {total_train_acc / (current_batch_num + 1):.05f}", end="")
 			print()
 
+			transformer.eval()
 			print("Validation steps...")
 			with torch.no_grad():
 				for current_batch_num, val_batch in enumerate(loaded_validation_data):
@@ -132,7 +149,12 @@ def main(args):
 
 					print(f"\r{current_batch_num + 1}/{batches_per_epoch_val}, loss: {total_val_loss / (current_batch_num + 1):.05f}, acc: {total_val_acc / (current_batch_num + 1)}", end="")
 			print()
-			
+
+			if best_val_acc < total_val_acc / num_val_predictions:
+				best_val_acc = total_val_acc / num_val_predictions
+				path_to_best_model_weights = os.path.join(model_save_path, f"model_{current_epoch + 1}.pt")
+				torch.save(transformer.state_dict(), path_to_best_model_weights)
+				
 			print(f"Epoch: {current_epoch:03d} | Train loss: {total_train_loss / num_train_predictions:.05f} | Train acc: {total_train_acc / num_train_predictions:.05f}"
 			f" | Val loss: {total_val_loss / num_val_predictions:.05f} | Val acc: {total_val_acc / num_val_predictions:.05f}")
 
