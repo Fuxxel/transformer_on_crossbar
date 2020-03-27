@@ -8,6 +8,12 @@ class Options(object):
 			"num_input_features": 250,
 			"learning_rate": 0.0005,
 			"num_epochs": 20,
+			"artifact_dir": "artifacts",
+			"problem": "coin", # also possible: 'fake' for fake sin data
+
+			# Coin Data Set Options
+			"path_to_coins": "data/all_coins_preprocessed.hdf5",
+			"hop_length": None, # If None defaults to window_size / 2 
 
 			# Fake Data Generator Options
 			"num_predict_forward_steps": 1,
@@ -32,7 +38,7 @@ class Options(object):
 			"num_encoder_layers": 1,
 			"norm": None,
 
-			# Decoder Opttions
+			# Decoder Options
 			"weight_intialization_range": 0.1
 		}
 
