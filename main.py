@@ -221,8 +221,7 @@ def main(args):
 			for i in range(num_samples):
 				print(f"\r{i + 1}/{num_samples}", end="")
 				gt_class, normalized_timeseries = test_data.sample_of_reference(i)
-				gt_classes.append(index_to_coin(gt_class.to("cpu").numpy()[()]))
-
+				
 				votes = []
 				max_length = normalized_timeseries.shape[0]
 				if options.sample_individual_timesteps:
@@ -260,9 +259,11 @@ def main(args):
 						prediction = transformer(window_to_predict).argmax(-1)[0]
 						votes.append(prediction.to("cpu").numpy()[()])
 
-				c = Counter(votes)
-				pred_class, _ = c.most_common()[0]
-				predicted_classes.append(index_to_coin(pred_class))
+				if len(votes) > 0:
+					c = Counter(votes)
+					pred_class, _ = c.most_common()[0]
+					predicted_classes.append(index_to_coin(pred_class))
+					gt_classes.append(index_to_coin(gt_class.to("cpu").numpy()[()]))
 		print()
 
 		overall_accuracy = (np.asarray(gt_classes) == np.asarray(predicted_classes)).sum() / len(gt_classes)
