@@ -83,7 +83,7 @@ class CoinDataSubset(Dataset):
 			coin, sample_num = self.preloaded_references[index]
 			one_hot_index, normalized_timeseries = self.__load_sample_from_data(coin, sample_num)
 
-			if self.__options.use_positional_embedding:
+			if self.__options.sample_individual_timesteps:
 				hop_length = self.__options.hop_length if self.__options.hop_length else self.window_size // 2
 				max_length = normalized_timeseries.shape[0]
 				for i in range(0, max_length - self.window_size, hop_length):
@@ -96,10 +96,14 @@ class CoinDataSubset(Dataset):
 				normalized_timeseries = normalized_timeseries.squeeze(-1)
 				for i in range(0, max_length - self.__options.num_input_features, hop_length):
 					all_embedings.append(normalized_timeseries[i:i + self.__options.num_input_features])
+				if max_length > 2 * self.__options.num_input_features and (max_length - self.__options.num_input_features) % hop_length != 0:
+					all_embedings.append(normalized_timeseries[-self.__options.num_input_features:])
 				
 				total_windows = len(all_embedings) // self.window_size
 				for i in range(0, total_windows, self.window_size):
 					self.preloaded_data.append((one_hot_index, torch.stack(all_embedings[i:i + self.window_size])))
+				if len(all_embedings) > self.window_size and len(all_embedings) % self.window_size != 0:
+					self.preloaded_data.append((one_hot_index, torch.stack(all_embedings[-self.window_size:])))
 		print()
 
 class CoinDataSetPreparer():

@@ -15,7 +15,6 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from collections import Counter
 import argparse
 from time import time
-from itertools import tee
 import os
 from datetime import datetime
 
@@ -33,7 +32,7 @@ def add_options_to_parser(parser):
 		if type(default_value) in [str, int, float]:
 			parser.add_argument("--" + name, type=type(default_value), default=default_value)
 		elif type(default_value) == bool:
-			parser.add_argument("--" + name, action="store_true" if default_value else "store_false")
+			parser.add_argument("--" + name, action="store_false" if default_value else "store_true")
 
 def update_options_from_args(options, args):
 	for arg in vars(args):
@@ -87,6 +86,7 @@ def main(args):
 		print(f"Save path: {model_save_path}")
 		os.makedirs(model_save_path, exist_ok=False)
 		write_options_to_file(options, os.path.join(model_save_path, "options.txt"))
+		print("Sampling individual timesteps" if options.sample_individual_timesteps else "Collecting multiple timesteps into embedding vector")
 		
 		criterion = CrossEntropyLoss()
 
@@ -163,7 +163,7 @@ def main(args):
 					acc = classification_accuracy(input=val_predictions, target=labels)
 					total_val_acc += acc
 
-					print(f"\r{current_batch_num + 1}/{batches_per_epoch_val}, loss: {total_val_loss / (current_batch_num + 1):.05f}, acc: {total_val_acc / (current_batch_num + 1)}", end="")
+					print(f"\r{current_batch_num + 1}/{batches_per_epoch_val}, loss: {total_val_loss / (current_batch_num + 1):.05f}, acc: {total_val_acc / (current_batch_num + 1):.05f}", end="")
 			print()
 
 			if best_val_acc < total_val_acc / num_val_predictions:
@@ -180,6 +180,9 @@ def main(args):
 		transformer.load_state_dict(torch.load(path_to_best_model_weights))
 		transformer.to(options.device)
 		transformer.eval()
+		
+		evaluation_result_text = ""
+		
 		predicted_classes = []
 		gt_classes = []
 		with torch.no_grad():
@@ -194,6 +197,7 @@ def main(args):
 		print()
 
 		overall_accuracy = (np.asarray(gt_classes) == np.asarray(predicted_classes)).sum() / len(gt_classes)
+		evaluation_result_text += f"window based accuracy: {overall_accuracy*100:.4f}%}\n"
 		cm_save_path = os.path.join(model_save_path, "confusion_matrix_window_based")
 		cm = confusion_matrix(y_true=gt_classes, y_pred=predicted_classes, labels=[1, 2, 5, 20, 50, 100, 200], normalize="true") 
 		cm *= 100
@@ -217,24 +221,40 @@ def main(args):
 
 				votes = []
 				max_length = normalized_timeseries.shape[0]
-				num_windows = (max_length - options.window_size) // hop_length
-				i = 0
-				while i < num_windows:
-					input_batch = []
-					for _ in range(min(options.batch_size, num_windows)):
-						if i <= normalized_timeseries.shape[0] - options.window_size:
-							window = normalized_timeseries[i:i + options.window_size]
-							i += hop_length
-							input_batch.append(window)
-					input_batch = torch.stack(input_batch).permute(1, 0, 2)
-					predictions = transformer(input_batch).argmax(-1)
-					for pred in predictions:
-						votes.append(pred.to("cpu").numpy()[()])
+				if options.sample_individual_timesteps:
+					hop_length = options.hop_length if options.hop_length else options.window_size // 2
+					num_windows = (max_length - options.window_size) // hop_length
+					i = 0
+					while i < num_windows:
+						input_batch = []
+						for _ in range(min(options.batch_size, num_windows)):
+							if i <= normalized_timeseries.shape[0] - options.window_size:
+								window = normalized_timeseries[i:i + options.window_size]
+								i += hop_length
+								input_batch.append(window)
+						input_batch = torch.stack(input_batch).permute(1, 0, 2)
+						predictions = transformer(input_batch).argmax(-1)
+						for pred in predictions:
+							votes.append(pred.to("cpu").numpy()[()])
+				else:
+					hop_length = options.hop_length if options.hop_length else options.num_input_features
 
-				# for i in range(0, max_length - options.window_size, hop_length):
-				# 	window = normalized_timeseries[i:i + options.window_size][None, ...].permute(1, 0, 2)
-				# 	pred = transformer(input_sequences).argmax(-1)[0].to("cpu").numpy()[()]
-				# 	votes.append(pred)
+					normalized_timeseries = normalized_timeseries.squeeze(-1)
+					all_embedings = []
+					for i in range(0, max_length - options.num_input_features, hop_length):
+						all_embedings.append(normalized_timeseries[i:i + options.num_input_features])
+					if max_length > 2 * options.num_input_features and (max_length - options.num_input_features) % hop_length != 0:
+						all_embedings.append(normalized_timeseries[-options.num_input_features:])
+
+					total_windows = len(all_embedings) // options.window_size
+					for i in range(0, total_windows, options.window_size):
+						window_to_predict = torch.stack(all_embedings[i:i + options.window_size]).unsqueeze(0).permute(1, 0, 2)
+						prediction = transformer(window_to_predict).argmax(-1)[0]
+						votes.append(prediction.to("cpu").numpy()[()])
+					if len(all_embedings) > options.window_size and len(all_embedings) % options.window_size != 0:
+						window_to_predict = torch.stack(all_embedings[-options.window_size:]).unsqueeze(0).permute(1, 0, 2)
+						prediction = transformer(window_to_predict).argmax(-1)[0]
+						votes.append(prediction.to("cpu").numpy()[()])
 
 				c = Counter(votes)
 				pred_class, _ = c.most_common()[0]
@@ -242,6 +262,7 @@ def main(args):
 		print()
 
 		overall_accuracy = (np.asarray(gt_classes) == np.asarray(predicted_classes)).sum() / len(gt_classes)
+		evaluation_result_text += f"sample based accuracy: {overall_accuracy*100:.4f}%}\n"
 		cm = confusion_matrix(y_true=gt_classes, y_pred=predicted_classes, labels=[1, 2, 5, 20, 50, 100, 200], normalize="true") 
 		cm *= 100
 		cm_save_path = os.path.join(model_save_path, "confusion_matrix_sample_based")
@@ -251,6 +272,9 @@ def main(args):
 		plt.savefig(cm_save_path + ".pdf")
 		plt.savefig(cm_save_path + ".png")
 		plt.clf()
+
+		with open(os.path.join(model_save_path, "test_results.txt"), "w") as txt_out:
+			txt_out.write(evaluation_result_text)
 
 	else:
 		criterion = MSELoss()

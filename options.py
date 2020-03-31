@@ -14,7 +14,7 @@ class Options(object):
 			# Coin Data Set Options
 			"path_to_coins": "data/all_coins_preprocessed.hdf5",
 			"hop_length": 125,
-			"use_positional_embedding": True, # If False: Uses data of size num_input_features as embedding 
+			"sample_individual_timesteps": False, # If False: Uses data of size num_input_features as embedding 
 
 			# Fake Data Generator Options
 			"num_predict_forward_steps": 1,

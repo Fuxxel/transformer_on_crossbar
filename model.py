@@ -41,8 +41,7 @@ class TransformerClassifier(torch.nn.Module):
 		if self.src_mask is None or self.src_mask.size(0) != len(x):
 			self.src_mask = self.__generate_square_subsequent_mask(len(x)).to(x.device)
 
-		if self.__options.use_positional_embedding:
-			x = self.pos_encoder(x)
+		x = self.pos_encoder(x)
 
 		output = self.encoder(x, self.src_mask)
 
