@@ -174,14 +174,18 @@ def main(args):
 			print(f"Epoch: {current_epoch:03d} | Train loss: {total_train_loss / num_train_predictions:.05f} | Train acc: {total_train_acc / num_train_predictions:.05f}"
 			f" | Val loss: {total_val_loss / num_val_predictions:.05f} | Val acc: {total_val_acc / num_val_predictions:.05f}")
 
+
+		evaluation_result_text = ""
+		
 		print("Running evaluation on test set")
 		print("Testing individual windows")
 		print(f"Using {path_to_best_model_weights} weights")
+		evaluation_result_text += f"Evaluated model: {path_to_best_model_weights} (saved as model_for_eval.pt)\n" 
+
 		transformer.load_state_dict(torch.load(path_to_best_model_weights))
+		torch.save(transformer.state_dict(), os.path.join(model_save_path, "model_for_eval.pt"))
 		transformer.to(options.device)
 		transformer.eval()
-		
-		evaluation_result_text = ""
 		
 		predicted_classes = []
 		gt_classes = []
@@ -197,7 +201,7 @@ def main(args):
 		print()
 
 		overall_accuracy = (np.asarray(gt_classes) == np.asarray(predicted_classes)).sum() / len(gt_classes)
-		evaluation_result_text += f"window based accuracy: {overall_accuracy*100:.4f}%}\n"
+		evaluation_result_text += f"window based accuracy: {overall_accuracy*100:.4f}%\n"
 		cm_save_path = os.path.join(model_save_path, "confusion_matrix_window_based")
 		cm = confusion_matrix(y_true=gt_classes, y_pred=predicted_classes, labels=[1, 2, 5, 20, 50, 100, 200], normalize="true") 
 		cm *= 100
@@ -262,7 +266,7 @@ def main(args):
 		print()
 
 		overall_accuracy = (np.asarray(gt_classes) == np.asarray(predicted_classes)).sum() / len(gt_classes)
-		evaluation_result_text += f"sample based accuracy: {overall_accuracy*100:.4f}%}\n"
+		evaluation_result_text += f"sample based accuracy: {overall_accuracy*100:.4f}%\n"
 		cm = confusion_matrix(y_true=gt_classes, y_pred=predicted_classes, labels=[1, 2, 5, 20, 50, 100, 200], normalize="true") 
 		cm *= 100
 		cm_save_path = os.path.join(model_save_path, "confusion_matrix_sample_based")
