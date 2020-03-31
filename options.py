@@ -13,7 +13,8 @@ class Options(object):
 
 			# Coin Data Set Options
 			"path_to_coins": "data/all_coins_preprocessed.hdf5",
-			"hop_length": None, # If None defaults to window_size / 2 
+			"hop_length": 125,
+			"use_positional_embedding": True, # If False: Uses data of size num_input_features as embedding 
 
 			# Fake Data Generator Options
 			"num_predict_forward_steps": 1,
@@ -39,7 +40,8 @@ class Options(object):
 			"norm": None,
 
 			# Decoder Options
-			"weight_intialization_range": 0.1
+			"weight_intialization_range": 0.1,
+			"classifier_hidden_size": 100
 		}
 
 	def get_option_names(self):

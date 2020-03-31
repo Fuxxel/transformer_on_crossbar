@@ -30,8 +30,10 @@ def add_options_to_parser(parser):
 	dummy_options = Options()
 	for name in dummy_options.get_option_names():
 		default_value = getattr(dummy_options, name)
-		if type(default_value) in [str, int, float, bool]:
+		if type(default_value) in [str, int, float]:
 			parser.add_argument("--" + name, type=type(default_value), default=default_value)
+		elif type(default_value) == bool:
+			parser.add_argument("--" + name, action="store_true" if default_value else "store_false")
 
 def update_options_from_args(options, args):
 	for arg in vars(args):
@@ -44,11 +46,15 @@ def classification_accuracy(input, target):
 	return (input.argmax(-1) == target).float().mean()
 
 def write_options_to_file(options, path):
+	print("--------------------")
+	print("Options:")
 	with open(path, "w") as out_file:
 		for name in options.get_option_names():
 			value = getattr(options, name)
 			if type(value) in [str, int, float, bool]:
 				out_file.write(f"{name}:{value}\n")
+				print(f"{name}:{value}")
+	print("--------------------")
 
 def index_to_coin(index):
 	coins = [1, 2, 5, 20, 50, 100, 200]
@@ -78,6 +84,7 @@ def main(args):
 	if options.problem == "coin":
 		timestamp = datetime.now().strftime("%y_%m_%d_%H_%M_%S_%f")
 		model_save_path = os.path.join(options.artifact_dir, timestamp)
+		print(f"Save path: {model_save_path}")
 		os.makedirs(model_save_path, exist_ok=False)
 		write_options_to_file(options, os.path.join(model_save_path, "options.txt"))
 		
@@ -99,9 +106,9 @@ def main(args):
 		validation_data.save_used_indices(os.path.join(model_save_path, "used_data", "validation.txt"))
 		test_data.save_used_indices(os.path.join(model_save_path, "used_data", "test.txt"))
 		
-		loaded_training_data = DataLoader(training_data, batch_size=batch_size, shuffle=True, drop_last=True)
-		loaded_validation_data = DataLoader(validation_data, batch_size=batch_size, shuffle=False, drop_last=True)
-		loaded_test_data = DataLoader(test_data, batch_size=batch_size, shuffle=False, drop_last=True)
+		loaded_training_data = DataLoader(training_data, batch_size=min(batch_size, len(training_data)) , shuffle=True, drop_last=True)
+		loaded_validation_data = DataLoader(validation_data, batch_size=min(batch_size, len(validation_data)), shuffle=False, drop_last=True)
+		loaded_test_data = DataLoader(test_data, batch_size=min(batch_size, len(test_data)), shuffle=False, drop_last=True)
 
 		batches_per_epoch_train = len(loaded_training_data)
 		batches_per_epoch_val = len(loaded_validation_data)
@@ -170,7 +177,8 @@ def main(args):
 		print("Running evaluation on test set")
 		print("Testing individual windows")
 		print(f"Using {path_to_best_model_weights} weights")
-		transformer.load_state_dict(torch.load(path_to_best_model_weights)).to(options.device)
+		transformer.load_state_dict(torch.load(path_to_best_model_weights))
+		transformer.to(options.device)
 		transformer.eval()
 		predicted_classes = []
 		gt_classes = []

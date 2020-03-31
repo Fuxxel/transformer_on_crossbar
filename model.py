@@ -24,26 +24,32 @@ class TransformerClassifier(torch.nn.Module):
 										  norm=self.__options.norm)
 		self.src_mask = None
 
-		self.classifier = Linear(in_features=options.num_input_features, out_features=7)
+		self.classifier_hidden = Linear(in_features=options.num_input_features, out_features=options.classifier_hidden_size)
+		self.classifier_out = Linear(in_features=options.classifier_hidden_size, out_features=7)
 
 		self.__init_decoder_weights()
 
 	def __init_decoder_weights(self):
 		init_range = self.__options.weight_intialization_range
 
-		self.classifier.bias.data.zero_()
-		self.classifier.weight.data.uniform_(-init_range, init_range)
+		self.classifier_hidden.bias.data.zero_()
+		self.classifier_hidden.weight.data.uniform_(-init_range, init_range)
+		self.classifier_out.bias.data.zero_()
+		self.classifier_out.weight.data.uniform_(-init_range, init_range)
 
 	def forward(self, x, return_latent=False):
 		if self.src_mask is None or self.src_mask.size(0) != len(x):
 			self.src_mask = self.__generate_square_subsequent_mask(len(x)).to(x.device)
 
-		x = self.pos_encoder(x)
+		if self.__options.use_positional_embedding:
+			x = self.pos_encoder(x)
+
 		output = self.encoder(x, self.src_mask)
 
 		# Only take the last tensor in memory sequence to predict 
 		to_classify = output[-1, :, :]
-		output = self.classifier(to_classify)
+		intermediate = torch.relu(self.classifier_hidden(to_classify))
+		output = self.classifier_out(intermediate)
 		if return_latent == False:
 			return output  
 		else:
