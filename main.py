@@ -44,13 +44,18 @@ def mse(x, y):
 def classification_accuracy(input, target):
 	return (input.argmax(-1) == target).float().mean()
 
-def write_options_to_file(options, path):
+def write_options_to_file(options, path, additional_info=None):
 	print("--------------------")
 	print("Options:")
 	with open(path, "w") as out_file:
 		for name in options.get_option_names():
 			value = getattr(options, name)
 			if type(value) in [str, int, float, bool]:
+				out_file.write(f"{name}:{value}\n")
+				print(f"{name}:{value}")
+
+		if additional_info:
+			for name, value in additional_info.items():
 				out_file.write(f"{name}:{value}\n")
 				print(f"{name}:{value}")
 	print("--------------------")
@@ -85,7 +90,9 @@ def main(args):
 		model_save_path = os.path.join(options.artifact_dir, timestamp)
 		print(f"Save path: {model_save_path}")
 		os.makedirs(model_save_path, exist_ok=False)
-		write_options_to_file(options, os.path.join(model_save_path, "options.txt"))
+		write_options_to_file(options, os.path.join(model_save_path, "options.txt"), additional_info={
+			"num_parameters": sum([p.numel() for p in transformer.parameters()])
+		})
 		print("Sampling individual timesteps" if options.sample_individual_timesteps else "Collecting multiple timesteps into embedding vector")
 		
 		criterion = CrossEntropyLoss()

@@ -1,0 +1,5 @@
+num_encoder_layers:1 
+encoder_number_of_heads:1 
+window_size:2048 
+num_input_features:100
+batch_size:16

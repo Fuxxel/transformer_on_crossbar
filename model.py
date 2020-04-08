@@ -4,6 +4,36 @@ from encoding import PositionalEncoding
 import torch
 from torch.nn import Module, TransformerEncoder, TransformerEncoderLayer, Linear
 
+class TransformerVisual(torch.nn.Module):
+	def __init__(self, options):
+		super(TransformerVisual, self).__init__()
+		
+		assert(type(options) == Options)
+		self.__options = options
+
+		self.encoder_layer = TransformerEncoderLayer(d_model=self.__options.num_input_features,
+													 nhead=self.__options.encoder_number_of_heads,
+													 dim_feedforward=self.__options.encoder_feedforward_dimension,
+													 dropout=self.__options.encoder_dropout,
+													 activation=self.__options.encoder_activation)
+
+		self.encoder = TransformerEncoder(encoder_layer=self.encoder_layer, 
+										  num_layers=self.__options.num_encoder_layers,
+										  norm=self.__options.norm)
+		self.src_mask = None
+
+	def forward(self, x, return_latent=False):
+		if self.src_mask is None or self.src_mask.size(0) != len(x):
+			self.src_mask = self.__generate_square_subsequent_mask(len(x)).to(x.device)
+
+		output = self.encoder(x, self.src_mask)
+
+		return output  
+		
+	def __generate_square_subsequent_mask(self, size):
+		mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
+		return mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+
 class TransformerClassifier(torch.nn.Module):
 	def __init__(self, options):
 		super(TransformerClassifier, self).__init__()
