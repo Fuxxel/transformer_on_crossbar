@@ -1,0 +1,3 @@
+Evaluated model: artifacts/20_04_03_21_50_23_043969/model_484.pt (saved as model_for_eval.pt)
+window based accuracy: 68.3333%
+sample based accuracy: 93.0205%
