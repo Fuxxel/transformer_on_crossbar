@@ -79,7 +79,7 @@ def main(args):
 
 	transformer = TransformerModel(options).to(options.device) if options.problem == "fake" else TransformerClassifier(options).to(options.device)
 	print(f"{transformer}")
-	print(f"Num parameters: {sum([p.numel() for p in transformer.parameters()]):,}")
+	print(f"Num parameters: {transformer.num_parameters():,}")
 	
 	optimizer = AdamW(params=transformer.parameters(), lr=options.learning_rate)
 
@@ -91,7 +91,7 @@ def main(args):
 		print(f"Save path: {model_save_path}")
 		os.makedirs(model_save_path, exist_ok=False)
 		write_options_to_file(options, os.path.join(model_save_path, "options.txt"), additional_info={
-			"num_parameters": sum([p.numel() for p in transformer.parameters()])
+			"num_parameters": transformer.num_parameters()
 		})
 		print("Sampling individual timesteps" if options.sample_individual_timesteps else "Collecting multiple timesteps into embedding vector")
 		

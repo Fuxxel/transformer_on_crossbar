@@ -22,6 +22,9 @@ class TransformerVisual(torch.nn.Module):
 										  norm=self.__options.norm)
 		self.src_mask = None
 
+	def num_parameters(self):
+		return sum(p.numel() for p in self.encoder.parameters(recurse=True) if p.requires_grad)
+
 	def forward(self, x, return_latent=False):
 		if self.src_mask is None or self.src_mask.size(0) != len(x):
 			self.src_mask = self.__generate_square_subsequent_mask(len(x)).to(x.device)
@@ -58,6 +61,12 @@ class TransformerClassifier(torch.nn.Module):
 		self.classifier_out = Linear(in_features=options.classifier_hidden_size, out_features=7)
 
 		self.__init_decoder_weights()
+
+	def num_parameters(self):
+		result = sum(p.numel() for p in self.encoder.parameters(recurse=True) if p.requires_grad)
+		result += sum(p.numel() for p in self.classifier_hidden.parameters(recurse=True) if p.requires_grad)
+		result += sum(p.numel() for p in self.classifier_out.parameters(recurse=True) if p.requires_grad)
+		return result
 
 	def __init_decoder_weights(self):
 		init_range = self.__options.weight_intialization_range
